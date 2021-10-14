@@ -50,7 +50,7 @@ Outputs:
     Value: !Sub aws s3 sync ${RelativePathToPublicFolder} s3://${WebsiteBucket} --delete
 
   ExampleOfHowToConsumeUploadCommand:
-    Description: The value will show you how to retrieve and execute the upload command above from a script while only knowing the name of the stack.
+    Description: The value will show you how to retrieve and immediately execute the upload command above from a script while only knowing the name of the stack.
     Value: !Sub $(aws cloudformation describe-stacks --stack-name ${AWS::StackName} --query "Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue" --output text)
 
 
