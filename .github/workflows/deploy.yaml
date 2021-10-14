@@ -40,4 +40,4 @@ jobs:
           no-fail-on-empty-changeset: 1
 
       - name: Publish static content to S3 Bucket
-        run: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query \"Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue\" --output text)
+        run: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue" --output text)
