@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  
+  RelativePathToPublicFolder:
+    Description: The content location. Not required but useful for crafting Output command
+    Type: String
+    Default: frontend/public/
+
+  Domain:
+    AllowedPattern: ^(\*\.)?(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
+    ConstraintDescription: must not begin or end with a period
+    Type: String
+
+  HostedZoneId:
+    Default: /domain/hosted-zone-id/charlieguse.com
+    Description: The hosted zone id of the domain.
+    Type: AWS::SSM::Parameter::Value<String>
+
+  EnableCaching:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+    Description: When debugging, it is good to disable caching
+
+  EnableDefaultObjectForSubdirectories:
+    Type: String
+    Default: CloudFront
+    AllowedValues:
+      - Disabled
+      - CloudFront
+      - Lambda@Edge
+
+
+Outputs:
+
+  Url:
+    Value: !Sub https://${WebsiteUrl}
+
+  CloudFrontUrl:
+    Value: !Sub https://${WebsiteDistribution.DomainName}
+
+  SourceS3Url:
+    Value: !Sub s3://${WebsiteBucket}
+
+  UploadCommand:
+    Description: The following S3 command will upload the local built copy of code (dist folder) to the website bucket
+    Value: !Sub aws s3 sync frontend/public/ s3://${WebsiteBucket} --delete
+
+
+Conditions:
+  CachingEnabled: !Equals [!Ref EnableCaching, true]
+  CachingDisabled: !Not [!Equals [!Ref EnableCaching, true]]
+
+  EnableLambdaAtEdge: !Equals [!Ref EnableDefaultObjectForSubdirectories, Lambda@Edge]
+  EnableCloudFrontFunction: !Equals [!Ref EnableDefaultObjectForSubdirectories, CloudFront]
+
+
+Resources:
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+
+  WebsiteBucketOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub ${AWS::StackName}:CloudFrontOriginAccessIdentity
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: "Grant a CloudFront Origin Identity access to support private content"
+            Action:
+              - s3:GetObject
+            Effect: "Allow"
+            Resource: !Sub ${WebsiteBucket.Arn}/*
+            Principal:
+              CanonicalUser: !GetAtt WebsiteBucketOAI.S3CanonicalUserId
+
+  WebsiteUrl:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt WebsiteDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget.html#cfn-route53-aliastarget-hostedzoneid
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Domain
+      Type: A
+
+  IndexRerouterOriginRequestRole:
+    Type: AWS::IAM::Role
+    Condition: CachingEnabled
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  # This function will uses lambda@edge
+  # Pricing is $0.60 per million requests with no free tier
+  # This is called on origin-request and if CloudFront has caching enabled
+  # this function will only get called when there isn't something in the cache
+  IndexRerouterOriginRequestFunction:
+    Type: AWS::Lambda::Function
+    Condition: EnableLambdaAtEdge
+    Properties:
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          exports.handler = (event, context, callback) => {
+            var request = event.Records[0].cf.request;
+            
+            var olduri = request.uri;
+            // Match any '/' that occurs at the end of a URI. Replace it with a default index
+            var newuri = olduri.replace(/\/$/, '\/index.html');
+            console.log(olduri + " reroutes to " + newuri);
+            request.uri = newuri;
+
+            return callback(null, request);
+          };
+      Role: !GetAtt IndexRerouterOriginRequestRole.Arn
+      Runtime: nodejs12.x
+
+  IndexRerouterOriginRequestFunctionVersion:
+    Type: AWS::Lambda::Version
+    Condition: EnableLambdaAtEdge
+    Properties:
+      FunctionName: !GetAtt IndexRerouterOriginRequestFunction.Arn
+
+  # https://aws.amazon.com/blogs/compute/implementing-default-directory-indexes-in-amazon-s3-backed-amazon-cloudfront-origins-using-lambdaedge/
+  # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/writing-function-code.html
+  # This function will uses CloudFront Functions
+  # Pricing is $0.10 per million requests with a free tier for the first year
+  # This is called on viewer-request and regardless of whether CloudFront
+  # has caching enabled this function will get called on every request
+  IndexRerouterViewerRequestFunction:
+    Type: AWS::CloudFront::Function
+    Condition: EnableCloudFrontFunction
+    Properties: 
+      AutoPublish: true
+      FunctionCode: |
+        function handler(event) {
+            var request = event.request;
+            
+            var olduri = request.uri;
+            // Match any '/' that occurs at the end of a URI. Replace it with a default index
+            var newuri = olduri.replace(/\/$/, '\/index.html');
+            console.log(olduri + " reroutes to " + newuri);
+            request.uri = newuri;
+
+            return request;
+        }
+      FunctionConfig:
+        Comment: Reroutes the request to the index.html of a request that ends in /
+        Runtime: cloudfront-js-1.0
+      Name: !Sub
+        - IndexRerouterViewerRequest-${Id}
+        - Id: !Select [2, !Split ['/', !Ref AWS::StackId]]
+
+  WebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref Domain
+        Comment: !Sub ${AWS::StackName}:Distribution
+        DefaultCacheBehavior:
+          CachePolicyId: !Ref WebsiteCachePolicy
+          Compress: true
+          FunctionAssociations: # Because of the cheaper price, and inability to cache viewer-requests, the default approach
+            !If
+              - EnableCloudFrontFunction
+              - - EventType: viewer-request
+                  FunctionARN: !Ref IndexRerouterViewerRequestFunction
+              - !Ref AWS::NoValue
+          LambdaFunctionAssociations: # Because of the price, best used with caching with a 6:1 or higher cache hit ratio
+            !If
+              - EnableLambdaAtEdge
+              - - EventType: origin-request
+                  LambdaFunctionARN: !Ref IndexRerouterOriginRequestFunctionVersion
+              - !Ref AWS::NoValue
+          OriginRequestPolicyId: !Ref WebsiteRequestPolicy
+          TargetOriginId: !Sub ${AWS::StackName}:${WebsiteBucket}:S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        Enabled: true
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.DomainName
+            Id: !Sub ${AWS::StackName}:${WebsiteBucket}:S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${WebsiteBucketOAI}
+        ViewerCertificate:
+          AcmCertificateArn: !Ref WebsiteCert
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  WebsiteCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Comment: Static S3 Website caching policy. Query strings are used in the caching strategy
+        DefaultTTL: !If [CachingEnabled, 86400, 0] # 86400 seconds (one day)
+        MaxTTL: !If [CachingEnabled, 31536000, 0] # 31536000 seconds (one year)
+        MinTTL: !If [CachingEnabled, 1, 0] # 1 second
+        Name: !Sub ${AWS::StackName}-WebsiteCachePolicy
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          EnableAcceptEncodingBrotli: !If [CachingEnabled, true, false]
+          EnableAcceptEncodingGzip: !If [CachingEnabled, true, false]
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  WebsiteRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Comment: Static S3 Website origin request policy. S3 doesn't need the cookies, headers, or query string
+        CookiesConfig:
+          CookieBehavior: none
+        HeadersConfig:
+          HeaderBehavior: whitelist
+          Headers:
+            - access-control-request-headers
+            - access-control-request-method
+            - origin
+        Name: !Sub ${AWS::StackName}-WebsiteRequestPolicy
+        QueryStringsConfig:
+          QueryStringBehavior: none
+
+  WebsiteCert:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref Domain
+      DomainValidationOptions:
+        - DomainName: !Ref Domain
+          HostedZoneId: !Ref HostedZoneId
+      ValidationMethod: DNS
+
