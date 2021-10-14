@@ -5,7 +5,7 @@ Parameters:
   RelativePathToPublicFolder:
     Description: The content location. Not required but useful for crafting Output command
     Type: String
-    Default: frontend/public/
+    Default: elderjs-app/public/
 
   Domain:
     AllowedPattern: ^(\*\.)?(((?!-)[A-Za-z0-9-]{0,62}[A-Za-z0-9])\.)+((?!-)[A-Za-z0-9-]{1,62}[A-Za-z0-9])$
@@ -197,7 +197,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
         Origins:
-          - DomainName: !GetAtt WebsiteBucket.DomainName
+          - DomainName: !GetAtt WebsiteBucket.RegionalDomainName
             Id: !Sub ${AWS::StackName}:${WebsiteBucket}:S3Origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${WebsiteBucketOAI}

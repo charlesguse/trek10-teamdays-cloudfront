@@ -9,6 +9,8 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    env:
+      STACK_NAME: trek10-team-days-cloudfront-broken-links
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -27,8 +29,15 @@ jobs:
         run: npm run-script build
         working-directory: elderjs-app
 
-      - name: Deploy CloudFormation stack
-        run: aws --version
+      - name: Deploy CloudFormation stack with broken links
+        uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3
+        with:
+          name: ${{ env.STACK_NAME }}
+          template: template.yaml
+          parameter-overrides: >-
+            Domain=broken.charlieguse.com,
+            EnableDefaultObjectForSubdirectories=Disabled
+          no-fail-on-empty-changeset: 1
 
       - name: Publish static content to S3 Bucket
-        run: aws --version
+        run: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query \"Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue\" --output text)
