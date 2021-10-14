@@ -6,7 +6,25 @@ on:
       - main
 
 jobs:
+  build:
+    name: Build elderjs-app static content
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+      - name: Clean Install NPM Dependencies
+        run: npm ci
+        working-directory: elderjs-app
+      - name: Build Elderjs static content
+        run: npm run-script build
+        working-directory: elderjs-app
+      - uses: actions/upload-artifact@v2
+        with:
+          name: static-content
+          path: elderjs-app/public/
+
   deploy:
+    needs: build
     name: Deploy
     runs-on: ubuntu-latest
     env:
@@ -20,14 +38,18 @@ jobs:
           aws-region: us-east-1
 
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: static-content
+          path: elderjs-app/public/
+      #- uses: actions/setup-node@v2
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: elderjs-app
-      - name: Build static content
-        run: npm run-script build
-        working-directory: elderjs-app
+      # - name: Install dependencies
+      #   run: npm ci
+      #   working-directory: elderjs-app
+      # - name: Build static content
+      #   run: npm run-script build
+      #   working-directory: elderjs-app
 
       - name: Deploy CloudFormation stack with broken links
         uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3

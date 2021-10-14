@@ -8,7 +8,7 @@ This repository will demo three different setups for a static site.
 
 ## What does it mean to retrieve a default object for subdirectories?
 
-CloudFront allows for a [`DefaultRootObject`](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-distributionconfig.html#cfn-cloudfront-distribution-distributionconfig-defaultrootobject). By default, going to a CloudFront url, it will show the index.html in the bucket. If you have index.html files in subdirectories, CloudFront will not automatically reroute to the index.html.
+CloudFront allows for a [`DefaultRootObject`](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-distributionconfig.html#cfn-cloudfront-distribution-distributionconfig-defaultrootobject). With `DefaultRootObject`, going to a CloudFront url, it will show the index.html in the bucket. If you have index.html files in subdirectories, CloudFront will not automatically reroute to the index.html. `DefaultRootObject` is not set in this example by design.
 
 This can be seen in the first example. By clicking on the links in the website spun up, they won't properly resolve. You can see where they SHOULD resolve to by manually changing the url to include `/index.html` on the end of the url.
 
@@ -24,7 +24,9 @@ Preferrably, the bucket should be locked down and NOT configured as a static sit
 
 There is a single CloudFormation template with multiple CloudFormation parameter files. Each parameter file will include the specifics to create the three different setups above. If you look into `.github/workflows/deploy.yaml`, you can see three separate deployments happening on commit. In practice, you will only need the one option you are going with but for demo purposes of this repository, all three are getting deployed.
 
-First, visit broken.charlieguse.com and try to use any of the sublinks on the site. You will see that links are broken and don't work. You can then manually, in the url bar, add `index.html` to the end of it to see the page that SHOULD have come up.
+First, visit https://broken.charlieguse.com/index.html and try to use any of the sublinks on the site. You will see that links are broken and don't work. Specifically, you will get an 403 AccessDenied error. You can then manually, in the url bar, add `index.html` to the end of it to see the page that SHOULD have come up. For example: https://broken.charlieguse.com/getting-started/ won't work but https://broken.charlieguse.com/getting-started/index.html will work.
+
+As a reminder, the reason you need to go to the `/index.html` is because `DefaultRootObject` is not set. If it was set to `index.html` you wouldn't need it for the root url but still need it for the links found on broken.charlieguse.com.
 
 Secondly, visit cf-function.charlieguse.com and you can see how the links now properly redirect you. You will see the same at lambdaedge.charlieguse.com and see that it works identically to cf-function.charlieguse.com.
 
