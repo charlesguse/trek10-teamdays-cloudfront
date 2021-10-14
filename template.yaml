@@ -47,7 +47,11 @@ Outputs:
 
   UploadCommand:
     Description: The following S3 command will upload the local built copy of code (dist folder) to the website bucket
-    Value: !Sub aws s3 sync frontend/public/ s3://${WebsiteBucket} --delete
+    Value: !Sub aws s3 sync ${RelativePathToPublicFolder} s3://${WebsiteBucket} --delete
+
+  ExampleOfHowToConsumeUploadCommand:
+    Description: The value will show you how to retrieve and execute the upload command above from a script while only knowing the name of the stack.
+    Value: !Sub $(aws cloudformation describe-stacks --stack-name ${AWS::StackName} --query \"Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue\" --output text)
 
 
 Conditions:
@@ -180,7 +184,7 @@ Resources:
         DefaultCacheBehavior:
           CachePolicyId: !Ref WebsiteCachePolicy
           Compress: true
-          FunctionAssociations: # Because of the cheaper price, and inability to cache viewer-requests, the default approach
+          FunctionAssociations: # Because of the cheaper price, the default approach that doesn't care whether you are caching the S3 content or not
             !If
               - EnableCloudFrontFunction
               - - EventType: viewer-request
