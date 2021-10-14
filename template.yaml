@@ -99,7 +99,7 @@ Resources:
 
   IndexRerouterOriginRequestRole:
     Type: AWS::IAM::Role
-    Condition: CachingEnabled
+    Condition: EnableLambdaAtEdge
     Properties:
       AssumeRolePolicyDocument:
         Statement:
