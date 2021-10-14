@@ -29,9 +29,9 @@ Parameters:
     Type: String
     Default: CloudFrontFunction
     AllowedValues:
-      - Disabled
-      - CloudFrontFunction
-      - LambdaEdge
+      - disabled
+      - cloudfront-function
+      - lambda-edge
 
 
 Outputs:
