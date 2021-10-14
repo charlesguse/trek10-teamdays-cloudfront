@@ -28,7 +28,18 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     env:
-      STACK_NAME: trek10-team-days-cloudfront-broken-links
+      BASE_URL: .t10.charlieguse.com
+      BASE_STACK_NAME: trek10-team-days-subdirectory-
+      # BROKEN_LINK_STACK_NAME: trek10-team-days-cloudfront-broken-links
+      # CF_FUNCTION_STACK_NAME: trek10-team-days-cloudfront-function
+      # LAMBDA_EDGE_STACK_NAME: trek10-team-days-lambda-edge
+    strategy:
+      fail-fast: false
+      matrix:
+        EnableDefaultObjectForSubdirectories:
+          - Disabled
+          - CloudFrontFunction
+          - LambdaEdge
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -42,24 +53,47 @@ jobs:
         with:
           name: static-content
           path: elderjs-app/public/
-      #- uses: actions/setup-node@v2
 
-      # - name: Install dependencies
-      #   run: npm ci
-      #   working-directory: elderjs-app
-      # - name: Build static content
-      #   run: npm run-script build
-      #   working-directory: elderjs-app
-
-      - name: Deploy CloudFormation stack with broken links
+      - name: Deploy CloudFormation stack with strategy EnableDefaultObjectForSubdirectories=${{ matrix.EnableDefaultObjectForSubdirectories }}
         uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3
         with:
-          name: ${{ env.STACK_NAME }}
+          name: ${{ env.BASE_STACK_NAME }}${{ matrix.EnableDefaultObjectForSubdirectories }}
           template: template.yaml
           parameter-overrides: >-
-            Domain=broken.charlieguse.com,
-            EnableDefaultObjectForSubdirectories=Disabled
+            Domain=${{ matrix.EnableDefaultObjectForSubdirectories }}${{ env.BASE_URL }},
+            EnableDefaultObjectForSubdirectories=${{ matrix.EnableDefaultObjectForSubdirectories }}
           no-fail-on-empty-changeset: 1
 
+
+      # - name: Deploy CloudFormation stack with broken links
+      #   uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3
+      #   with:
+      #     name: ${{ env.BROKEN_LINK_STACK_NAME }}
+      #     template: template.yaml
+      #     parameter-overrides: >-
+      #       Domain=broken.charlieguse.com,
+      #       EnableDefaultObjectForSubdirectories=Disabled
+      #     no-fail-on-empty-changeset: 1
+      
+      # - name: Deploy CloudFormation stack with working links using CloudFront Functions
+      #   uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3
+      #   with:
+      #     name: ${{ env.CF_FUNCTION_STACK_NAME }}
+      #     template: template.yaml
+      #     parameter-overrides: >-
+      #       Domain=cf-function.charlieguse.com,
+      #       EnableDefaultObjectForSubdirectories=CloudFrontFunction
+      #     no-fail-on-empty-changeset: 1
+
+      # - name: Deploy CloudFormation stack with working links using Lambda@Edge
+      #   uses: aws-actions/aws-cloudformation-github-deploy@v1.0.3
+      #   with:
+      #     name: ${{ env.BROKEN_LINK_STACK_NAME }}
+      #     template: template.yaml
+      #     parameter-overrides: >-
+      #       Domain=lambdaedge.charlieguse.com,
+      #       EnableDefaultObjectForSubdirectories=LambdaEdge
+      #     no-fail-on-empty-changeset: 1
+
       - name: Publish static content to S3 Bucket
-        run: $(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue" --output text)
+        run: $(aws cloudformation describe-stacks --stack-name ${{ env.BASE_STACK_NAME }}${{ matrix.EnableDefaultObjectForSubdirectories }} --query "Stacks[*].Outputs[?OutputKey=='UploadCommand'].OutputValue" --output text)

@@ -27,11 +27,11 @@ Parameters:
 
   EnableDefaultObjectForSubdirectories:
     Type: String
-    Default: CloudFront
+    Default: CloudFrontFunction
     AllowedValues:
       - Disabled
-      - CloudFront
-      - Lambda@Edge
+      - CloudFrontFunction
+      - LambdaEdge
 
 
 Outputs:
@@ -58,8 +58,8 @@ Conditions:
   CachingEnabled: !Equals [!Ref EnableCaching, true]
   CachingDisabled: !Not [!Equals [!Ref EnableCaching, true]]
 
-  EnableLambdaAtEdge: !Equals [!Ref EnableDefaultObjectForSubdirectories, Lambda@Edge]
-  EnableCloudFrontFunction: !Equals [!Ref EnableDefaultObjectForSubdirectories, CloudFront]
+  EnableLambdaAtEdge: !Equals [!Ref EnableDefaultObjectForSubdirectories, LambdaEdge]
+  EnableCloudFrontFunction: !Equals [!Ref EnableDefaultObjectForSubdirectories, CloudFrontFunction]
 
 
 Resources:
