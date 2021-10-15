@@ -23,16 +23,18 @@ Preferrably, the bucket should be locked down and NOT configured as a static sit
 # How to follow along
 
 https://disabled.t10.charlieguse.com/index.html
+
 https://cloudfront-function.t10.charlieguse.com/
+
 https://lambda-edge.t10.charlieguse.com/
 
 There is a single CloudFormation template with multiple CloudFormation parameter files. Each parameter file will include the specifics to create the three different setups above. If you look into `.github/workflows/deploy.yaml`, you can see three separate deployments happening on commit (using `strategy.matrix`). In practice, you will only need the one option you are going with but for demo purposes of this repository, all three are getting deployed.
 
-First, visit https://disabled.t10.charlieguse.com/index.html and try to use any of the sublinks on the site. You will see that links are broken and don't work. Specifically, you will get an 403 AccessDenied error. You can then manually, in the url bar, add `index.html` to the end of it to see the page that SHOULD have come up. For example: https://disabled.t10.charlieguse.com/getting-started/ won't work but https://disabled.t10.charlieguse.com/getting-started/index.html will work.
+First, visit [disabled.t10.charlieguse.com/index.html](https://disabled.t10.charlieguse.com/index.html) and try to use any of the sublinks on the site. You will see that links are broken and don't work. Specifically, you will get an 403 AccessDenied error. You can then manually, in the url bar, add `index.html` to the end of it to see the page that SHOULD have come up. For example: [disabled.t10.charlieguse.com/getting-started/](https://disabled.t10.charlieguse.com/getting-started) won't work but [disabled.t10.charlieguse.com/getting-started/index.html](https://disabled.t10.charlieguse.com/getting-started/index.html) will work.
 
 As a reminder, the reason you need to go to the `/index.html` is because `DefaultRootObject` is not set. If it was set to `index.html` you wouldn't need it for the root url but still need it for the links found on broken.charlieguse.com.
 
-Secondly, visit https://cloudfront-function.t10.charlieguse.com/ and you can see how the links now properly redirect you. You will see the same at https://lambda-edge.t10.charlieguse.com/ and see that it works identically to https://cloudfront-function.t10.charlieguse.com/.
+Secondly, visit [cloudfront-function.t10.charlieguse.com](https://cloudfront-function.t10.charlieguse.com/) and you can see how the links now properly redirect you. You will see the same at [lambda-edge.t10.charlieguse.com](https://lambda-edge.t10.charlieguse.com/) and see that it works identically to [cloudfront-function.t10.charlieguse.com](https://cloudfront-function.t10.charlieguse.com/).
 
 ## Why demo two approaches that accomplish the same thing?
 The implementation details will drive AWS costs. If you don't want to consider it deeply, use CloudFront Functions and you are likely to be ok. It will add roughly 10% to your CloudFront invocation charges and an additional 0% to data egress fees. Whether the files are cached or not, the CloudFront Function will always trigger.
