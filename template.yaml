@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
   
   RelativePathToPublicFolder:
-    Description: The content location. Not required but useful for crafting Output command
+    Description: The content location. Not required but useful for crafting Output command.
     Type: String
     Default: elderjs-app/public/
 
